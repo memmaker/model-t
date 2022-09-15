@@ -9,8 +9,11 @@ import (
 )
 
 type MemoryLayout struct {
-	TopLabel      *tview.TextView
+	RootContainer *tview.Flex
+	TopBar        *tview.Flex
+	BottomBar     *tview.Flex
 	App           *tview.Application
+	Modal         *tview.Flex
 	PageContainer *tview.Pages
 	Pages         []Page
 	CurrentPage   Page
@@ -47,7 +50,9 @@ type Model struct {
 }
 
 var ctx = MemoryLayout{
-	TopLabel:      tview.NewTextView(),
+	RootContainer: tview.NewFlex().SetDirection(tview.FlexRow),
+	TopBar:        tview.NewFlex().SetDirection(tview.FlexColumn),
+	BottomBar:     tview.NewFlex().SetDirection(tview.FlexColumn),
 	App:           tview.NewApplication(),
 	PageContainer: tview.NewPages(),
 }
@@ -56,15 +61,57 @@ func main() {
 	loadDataFromServer()
 
 	if len(ctx.Pages) == 0 {
-
 		addPage(Model{})
 		addField()
 	}
-	ctx.PageContainer.SetInputCapture(inputHandler)
+	ctx.RootContainer.SetInputCapture(inputHandler)
+	ctx.RootContainer.AddItem(ctx.TopBar, 1, 0, false)
+	ctx.RootContainer.AddItem(ctx.PageContainer, 0, 1, true)
+	ctx.RootContainer.AddItem(ctx.BottomBar, 1, 0, false)
+	ctx.BottomBar.AddItem(tview.NewTextView().SetText("F2: Add Field, F3: Remove Field, F4: Toggle Required, F7: Page Backward, F8: Page Forward, F10: Print and Quit"), 0, 1, false)
 
-	if err := ctx.App.SetRoot(ctx.PageContainer, true).SetFocus(ctx.CurrentPage.UIForm).Run(); err != nil {
+	if err := ctx.App.SetRoot(ctx.RootContainer, true).SetFocus(ctx.CurrentPage.UIForm).Run(); err != nil {
 		panic(err)
 	}
+}
+
+func toggleModal() {
+	if ctx.Modal == nil {
+		showModal()
+	} else {
+		closeModal()
+	}
+}
+
+func makeModal(p tview.Primitive, width, height int) tview.Primitive {
+	return tview.NewGrid().
+		SetColumns(0, width, 0).
+		SetRows(0, height, 0).
+		AddItem(p, 1, 1, 1, 1, 0, 0, true)
+}
+
+func showModal() {
+	createModelUI(ctx.CurrentPage.Model.Name)
+	ctx.PageContainer.AddAndSwitchToPage(".modal.", makeModal(ctx.Modal, 50, 25), true)
+	ctx.PageContainer.ShowPage(ctx.CurrentPage.Title)
+	//ctx.App.SetFocus(ctx.Modal)
+}
+
+func createModelUI(modelName string) {
+	ctx.Modal = tview.NewFlex().SetDirection(tview.FlexRow)
+	ctx.Modal.Box = tview.NewBox().SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+	ctx.Modal.SetTitle("Model: " + modelName)
+	ctx.Modal.SetBorder(true)
+	ctx.Modal.AddItem(tview.NewInputField().SetLabel(" Name: ").SetText(modelName), 1, 0, true)
+	ctx.Modal.AddItem(tview.NewInputField().SetLabel(" Disp. Template: ").SetText(""), 1, 0, true)
+	// add checkbox
+	ctx.Modal.AddItem(tview.NewCheckbox().SetLabel(" Hidden: "), 1, 0, true)
+}
+
+func closeModal() {
+	ctx.PageContainer.RemovePage(".modal.")
+	ctx.App.SetFocus(ctx.CurrentPage.UIForm)
+	ctx.Modal = nil
 }
 
 // addPage creates a new Page struct with a new UIForm and adds the given model to it.
@@ -76,8 +123,8 @@ func addPage(model Model) {
 		name = model.Name
 	}
 	pageForm := tview.NewFlex().SetDirection(tview.FlexRow)
-	pageForm.SetBorder(true).SetTitle(name).SetTitleAlign(tview.AlignLeft)
-
+	pageForm.SetBorder(true).SetTitleAlign(tview.AlignCenter)
+	setFormTitle(pageForm, name)
 	page := Page{
 		Title:  name,
 		UIForm: pageForm,
@@ -93,17 +140,35 @@ func addPage(model Model) {
 	ctx.CurrentPage = page
 }
 
+func setFormTitle(form *tview.Flex, givenModelName string) {
+	var title string
+	for _, modelName := range modelNames {
+		if modelName == givenModelName {
+			title += "[white:blue:b]|" + modelName + "|[-:-:-]"
+		} else {
+			title += " " + modelName + " "
+		}
+	}
+	form.SetTitle(" " + title + " ")
+}
+
 func loadDataFromServer() {
 	fieldTypes = getFieldTypes()
 	allModels := getModels()
-	modelNames = make([]string, len(allModels))
-	for index, model := range allModels {
-		modelNames[index] = model.Name
+	setModelNames(allModels)
+	for _, model := range allModels {
 		addPage(model)
 		for rowIndex, _ := range model.Fields {
 			addField()
 			changeRowType(rowIndex)
 		}
+	}
+}
+
+func setModelNames(allModels []Model) {
+	modelNames = make([]string, len(allModels))
+	for index, model := range allModels {
+		modelNames[index] = model.Name
 	}
 }
 
@@ -114,10 +179,14 @@ func inputHandler(event *tcell.EventKey) *tcell.EventKey {
 		removeField()
 	} else if event.Key() == tcell.KeyF4 {
 		toggleRequired()
+	} else if event.Key() == tcell.KeyF5 {
+		toggleSearchable()
 	} else if event.Key() == tcell.KeyF7 {
 		pageBackward()
 	} else if event.Key() == tcell.KeyF8 {
 		pageForward()
+	} else if event.Key() == tcell.KeyF9 {
+		toggleModal()
 	} else if event.Key() == tcell.KeyF10 {
 		printAndQuit()
 	}
@@ -132,6 +201,7 @@ func pageForward() {
 				ctx.PageContainer.SwitchToPage(ctx.Pages[index+1].Title)
 				ctx.CurrentPage = ctx.Pages[index+1]
 			}
+			return
 		}
 	}
 }
@@ -143,6 +213,7 @@ func pageBackward() {
 				ctx.PageContainer.SwitchToPage(ctx.Pages[index-1].Title)
 				ctx.CurrentPage = ctx.Pages[index-1]
 			}
+			return
 		}
 	}
 }

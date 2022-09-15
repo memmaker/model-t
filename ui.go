@@ -76,6 +76,7 @@ func createFieldRow() *tview.Flex {
 }
 func addFlagsLabel(rowContainer *tview.Flex) {
 	flagsLabel := tview.NewTextView().SetText("Flags: ")
+	flagsLabel.SetDynamicColors(true)
 	rowContainer.AddItem(flagsLabel, 15, 0, false)
 }
 
@@ -118,7 +119,7 @@ func addTypeSelector(rowContainer *tview.Flex, itemIndex int, presetValue int) *
 		ctx.CurrentPage.Model.Fields[itemIndex]["type"] = text
 		changeRowType(itemIndex)
 	})
-	rowContainer.AddItem(dropDown, 18, 0, true)
+	rowContainer.AddItem(dropDown, 25, 0, true)
 	return dropDown
 }
 
@@ -226,21 +227,50 @@ func removeField() {
 }
 
 func toggleRequired() {
-	ctx.CurrentPage.Model.Fields[focusIndex]["required"] = !ctx.CurrentPage.Model.Fields[focusIndex]["required"].(bool)
+	ctx.CurrentPage.Model.Fields[focusIndex]["required"] = !keyValueOrFalse(ctx.CurrentPage.Model.Fields[focusIndex], "required")
+	updateFlags(focusIndex)
+}
+
+func toggleSearchable() {
+	fieldName := ctx.CurrentPage.Model.Fields[focusIndex]["name"].(string)
+	if foundIndex := contains(ctx.CurrentPage.Model.SearchFields, fieldName); foundIndex > -1 {
+		ctx.CurrentPage.Model.SearchFields = append(ctx.CurrentPage.Model.SearchFields[:foundIndex], ctx.CurrentPage.Model.SearchFields[foundIndex+1:]...)
+	} else {
+		ctx.CurrentPage.Model.SearchFields = append(ctx.CurrentPage.Model.SearchFields, fieldName)
+	}
 	updateFlags(focusIndex)
 }
 
 func updateFlags(index int) {
 	rowContainer := ctx.CurrentPage.UIForm.GetItem(index).(*tview.Flex)
+
 	flagsLabel := rowContainer.GetItem(rowContainer.GetItemCount() - 1).(*tview.TextView)
-	flagsLabel.SetText(fmt.Sprintf("Flags: %s", getFlagsString(ctx.CurrentPage.Model.Fields[index])))
+	flagsLabel.SetText(fmt.Sprintf("Flags: %s", getFlagsString(ctx.CurrentPage.Model, ctx.CurrentPage.Model.Fields[index])))
 }
 
-func getFlagsString(fieldDefinition JsonObject) string {
+func getFlagsString(model Model, fieldDefinition JsonObject) string {
+	fieldName := fieldDefinition["name"].(string)
 	flags := ""
 	isRequired := keyValueOrFalse(fieldDefinition, "required")
+	isSearchField := contains(model.SearchFields, fieldName) > -1
 	if isRequired {
 		flags += "R"
+	} else {
+		flags += "[gray]-[-]"
+	}
+	if isSearchField {
+		flags += "S"
+	} else {
+		flags += "[gray]-[-]"
 	}
 	return flags
+}
+
+func contains(list []string, value string) int {
+	for index, item := range list {
+		if item == value {
+			return index
+		}
+	}
+	return -1
 }
