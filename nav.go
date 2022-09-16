@@ -19,7 +19,7 @@ func navigation(key tcell.Key, subPositionHint SubItemPosition) {
 	if key == tcell.KeyTab && subPositionHint == End {
 		focusForward(ctx.CurrentPage.UIForm)
 	} else if key == tcell.KeyBacktab && subPositionHint == Start {
-		focusBackward(ctx.CurrentPage.UIForm)
+		focusBackwardForFields(ctx.CurrentPage.UIForm)
 	} else if key == tcell.KeyTab && (subPositionHint == Start || subPositionHint == Middle) {
 		focusForwardInRow(ctx.CurrentPage.UIForm)
 	} else if key == tcell.KeyBacktab && (subPositionHint == End || subPositionHint == Middle) {
@@ -28,6 +28,22 @@ func navigation(key tcell.Key, subPositionHint SubItemPosition) {
 		focusRowDown(ctx.CurrentPage.UIForm)
 	} else if key == tcell.KeyUp {
 		focusRowUp(ctx.CurrentPage.UIForm)
+	}
+}
+
+func modalNavigation(key tcell.Key, subPositionHint SubItemPosition) {
+	if key == tcell.KeyTab && subPositionHint == End {
+		focusForward(ctx.Modal)
+	} else if key == tcell.KeyBacktab && subPositionHint == Start {
+		focusBackward(ctx.Modal)
+	} else if key == tcell.KeyTab && (subPositionHint == Start || subPositionHint == Middle) {
+		focusForward(ctx.Modal)
+	} else if key == tcell.KeyBacktab && (subPositionHint == End || subPositionHint == Middle) {
+		focusBackward(ctx.Modal)
+	} else if key == tcell.KeyDown {
+		focusForward(ctx.Modal)
+	} else if key == tcell.KeyUp {
+		focusBackward(ctx.Modal)
 	}
 }
 
@@ -86,7 +102,17 @@ func focusForward(container *tview.Flex) {
 	field := container.GetItem(focusIndex)
 	ctx.App.SetFocus(field)
 }
+
 func focusBackward(container *tview.Flex) {
+	focusIndex = focusIndex - 1
+	if focusIndex < 0 {
+		focusIndex = container.GetItemCount() - 1
+	}
+	field := container.GetItem(focusIndex)
+	ctx.App.SetFocus(field)
+}
+
+func focusBackwardForFields(container *tview.Flex) {
 	focusIndex = focusIndex - 1
 	if focusIndex < 0 {
 		focusIndex = container.GetItemCount() - 1

@@ -22,6 +22,7 @@ func getFieldTypes() []string {
 	var fieldResponse FieldResponse
 	osCommand := exec.Command(oreCommand, "fields")
 	jsonString, err := osCommand.Output()
+	fmt.Println("getFieldTypes Req. Returned: ", string(jsonString))
 	if err != nil {
 		panic(err)
 	}
@@ -33,6 +34,7 @@ func getModels() []Model {
 	var models []Model
 	osCommand := exec.Command(oreCommand, "models")
 	jsonString, err := osCommand.Output()
+	fmt.Println("getModels Req. Returned: ", string(jsonString))
 	if err != nil {
 		panic(err)
 	}

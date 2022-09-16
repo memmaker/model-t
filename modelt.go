@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+	"regexp"
 	"strconv"
 )
 
@@ -91,21 +92,66 @@ func makeModal(p tview.Primitive, width, height int) tview.Primitive {
 }
 
 func showModal() {
-	createModelUI(ctx.CurrentPage.Model.Name)
+	createModelUI(&ctx.CurrentPage.Model)
 	ctx.PageContainer.AddAndSwitchToPage(".modal.", makeModal(ctx.Modal, 50, 25), true)
 	ctx.PageContainer.ShowPage(ctx.CurrentPage.Title)
+	focusIndex = 1
 	//ctx.App.SetFocus(ctx.Modal)
 }
 
-func createModelUI(modelName string) {
+func createModelUI(model *Model) {
+	modelName := model.Name
 	ctx.Modal = tview.NewFlex().SetDirection(tview.FlexRow)
 	ctx.Modal.Box = tview.NewBox().SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 	ctx.Modal.SetTitle("Model: " + modelName)
 	ctx.Modal.SetBorder(true)
-	ctx.Modal.AddItem(tview.NewInputField().SetLabel(" Name: ").SetText(modelName), 1, 0, true)
-	ctx.Modal.AddItem(tview.NewInputField().SetLabel(" Disp. Template: ").SetText(""), 1, 0, true)
-	// add checkbox
-	ctx.Modal.AddItem(tview.NewCheckbox().SetLabel(" Hidden: "), 1, 0, true)
+	modelNameInput := tview.NewInputField().
+		SetLabel(" Name: ").
+		SetText(modelName)
+
+	displayTemplateInput := tview.NewInputField().
+		SetLabel(" Disp. Template: ").
+		SetText(model.DisplayTemplate).
+		SetChangedFunc(func(text string) {
+			if text != "" && len(text) < 6 {
+				return
+			}
+			model.DisplayTemplate = text
+			deriveDisplayFields(model)
+		})
+
+	hiddenCheckbox := tview.NewCheckbox().
+		SetLabel(" Hidden: ").
+		SetChecked(model.Hidden).
+		SetChangedFunc(func(checked bool) {
+			model.Hidden = checked
+		})
+
+	ctx.Modal.AddItem(modelNameInput.SetDoneFunc(func(key tcell.Key) {
+		modalNavigation(key, Start)
+	}), 1, 0, false)
+
+	ctx.Modal.AddItem(displayTemplateInput.SetDoneFunc(func(key tcell.Key) {
+		modalNavigation(key, Middle)
+	}), 1, 0, true)
+
+	ctx.Modal.AddItem(hiddenCheckbox.SetDoneFunc(func(key tcell.Key) {
+		modalNavigation(key, End)
+	}), 1, 0, true)
+}
+
+func deriveDisplayFields(model *Model) {
+	displayFields := []string{}
+	// find all occurrences of {{ .field_name }} in the display template using regex
+	regexPattern := regexp.MustCompile(`{{\s*\.\s*([a-zA-Z0-9_\\-]+)\s*}}`)
+	matches := regexPattern.FindAllStringSubmatch(model.DisplayTemplate, -1)
+	for _, match := range matches {
+		displayFields = append(displayFields, match[1])
+	}
+
+	model.DisplayFields = displayFields
+	//fmt.Println("Template: ", model.DisplayTemplate)
+	//fmt.Println("-> Display Fields: ", model.DisplayFields)
 }
 
 func closeModal() {
